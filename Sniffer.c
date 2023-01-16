@@ -12,6 +12,8 @@
 
 FILE *file;
 
+void printData(const u_char *data, int size);
+
 typedef struct calculatorPacket {
     uint32_t unixtime;
     uint16_t length;
@@ -21,12 +23,14 @@ typedef struct calculatorPacket {
 } cpack, *pcpack;
 
 void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
-
+    unsigned int size = h->len;
     struct ether_header *ether_header = (struct ether_header *) bytes;
     struct iphdr *ip_header = (struct iphdr *) (bytes + sizeof(struct ether_header));
     struct tcphdr *tcp_header = (struct tcphdr *) (bytes + sizeof(struct ether_header) + sizeof(struct iphdr));
     pcpack app_header = (pcpack) (bytes + sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct tcphdr));
-
+    int iphdrlen = ip_header->ihl * 4;
+//    unsigned long header_size = sizeof(struct ether_header) + iphdrlen + tcp_header->doff * 4 + sizeof(app_header) + 12;
+    unsigned long header_size = sizeof(struct ether_header) + iphdrlen + iphdrlen + sizeof(pcpack);
     //Print out ethernet, IP and TCP headers
     fprintf(file, "******************************************************\n");
     fprintf(file, "Ethernet Layer\n");
@@ -72,12 +76,50 @@ void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_char *byt
     fprintf(file, "Cache: %d\n", app_header->cache);
     fprintf(file, "Padding: %d\n", app_header->padding);
     fprintf(file, "******************************************************\n");
-
+    printData(bytes + header_size-62, size);
 
 }
 
+void printData(const u_char *data, int size) {
+    int i, j;
+    for (i = 0; i < size; i++) {
+        if (i != 0 && i % 16 == 0)   //if one line of hex printing is complete...
+        {
+            fprintf(file, "         ");
+            for (j = i - 16; j < i; j++) {
+                if (data[j] >= 32 && data[j] <= 128)
+                    fprintf(file, "%c", (unsigned char) data[j]); //if its a number or alphabet
 
-int main(int argc, char *argv[]) {
+                else fprintf(file, "."); //otherwise print a dot
+            }
+            fprintf(file, "\n");
+        }
+
+        if (i % 16 == 0) fprintf(file, "   ");
+        fprintf(file, " %02X", (unsigned int) data[i]);
+
+        if (i == size - 1)  //print the last spaces
+        {
+            for (j = 0; j < 15 - i % 16; j++) {
+                fprintf(file, "   "); //extra spaces
+            }
+
+            fprintf(file, "         ");
+
+            for (j = i - i % 16; j <= i; j++) {
+                if (data[j] >= 32 && data[j] <= 128) {
+                    fprintf(file, "%c", (unsigned char) data[j]);
+                } else {
+                    fprintf(file, ".");
+                }
+            }
+
+            fprintf(file, "\n");
+        }
+    }
+}
+
+int main() {
     pcap_t *handle;
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;
@@ -102,5 +144,6 @@ int main(int argc, char *argv[]) {
     pcap_loop(handle, -1, packet_handler, NULL);
 
     pcap_close(handle);   //Close the handle
+    fclose(file);
     return 0;
 }

@@ -5,18 +5,18 @@
 #include <unistd.h>
 
 struct ipheader {
-    unsigned char      iph_ihl:4, //IP header length
-    iph_ver:4; //IP version
-    unsigned char      iph_tos; //Type of service
+    unsigned char iph_ihl: 4, //IP header length
+    iph_ver: 4; //IP version
+    unsigned char iph_tos; //Type of service
     unsigned short int iph_len; //IP Packet length (data + header)
     unsigned short int iph_ident; //Identification
-    unsigned short int iph_flag:3, //Fragmentation flags
-    iph_offset:13; //Flags offset
-    unsigned char      iph_ttl; //Time to Live
-    unsigned char      iph_protocol; //Protocol type
+    unsigned short int iph_flag: 3, //Fragmentation flags
+    iph_offset: 13; //Flags offset
+    unsigned char iph_ttl; //Time to Live
+    unsigned char iph_protocol; //Protocol type
     unsigned short int iph_chksum; //IP datagram checksum
-    struct  in_addr    iph_sourceip; //Source IP address
-    struct  in_addr    iph_destip;   //Destination IP address
+    struct in_addr iph_sourceip; //Source IP address
+    struct in_addr iph_destip;   //Destination IP address
 };
 
 struct icmpheader {
@@ -59,40 +59,26 @@ unsigned short in_cksum(unsigned short *buf, int length) {
 void send_raw_ip_packet(struct ipheader *ip) {
     struct sockaddr_in dest_info;
     int enable = 1;
-
     // Step 1: Create a raw network socket.
     int sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-
     // Step 2: Set socket option.
     setsockopt(sock, IPPROTO_IP, IP_HDRINCL,
                &enable, sizeof(enable));
-
     // Step 3: Provide needed information about destination.
     dest_info.sin_family = AF_INET;
     dest_info.sin_addr = ip->iph_destip;
-
     // Step 4: Send the packet out.
-    int bytesSent =sendto(sock, ip, ntohs(ip->iph_len), 0,(struct sockaddr *) &dest_info, sizeof(dest_info));
-    if (bytesSent==-1 ) {
-        printf("error\n");
-    }
-    else {
-        printf("yay\n");
-    }
-    char *buffer=NULL;
-    socklen_t len = sizeof(dest_info);
-    int bytesReceived= recvfrom(sock,buffer,BUFSIZ,0,(struct sockaddr *) &dest_info,&len);
-    if (bytesReceived==-1) {
+    int bytesSent = sendto(sock, ip, ntohs(ip->iph_len), 0, (struct sockaddr *) &dest_info, sizeof(dest_info));
+    if (bytesSent == -1) {
         printf("error\n");
     } else {
-        printf("%d\n",bytesReceived);
+        printf("sent");
     }
     close(sock);
 }
 
 int main() {
     char buffer[1500];
-
     memset(buffer, 0, 1500);
     /*********************************************************
        Step 1: Fill in the ICMP header.
@@ -123,6 +109,5 @@ int main() {
        Step 3: Finally, send the spoofed packet
      ********************************************************/
     send_raw_ip_packet(ip);
-
     return 0;
 }
