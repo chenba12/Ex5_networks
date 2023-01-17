@@ -2,12 +2,10 @@
 #include <pcap.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include <net/ethernet.h>
-#include<stdlib.h> // for exit()
-#include<netinet/udp.h>    //Provides declarations for udp header
-#include<netinet/tcp.h>    //Provides declarations for tcp header
-#include<netinet/ip.h>    //Provides declarations for ip header
-#include <netinet/ether.h>
+#include <stdlib.h>        // for exit()
+#include <netinet/tcp.h>   //Provides declarations for tcp header
+#include <netinet/ip.h>    //Provides declarations for ip header
+#include <netinet/ether.h> //Provides declarations for ethernet header
 #include <time.h>
 
 FILE *file;
@@ -15,80 +13,75 @@ FILE *file;
 void printData(const u_char *data, int size);
 
 typedef struct calculatorPacket {
-    uint32_t unixtime;
-    uint16_t total_length;
-    union {
-        uint16_t flags;
-        uint16_t _: 3, c_flag: 1, s_flag: 1, t_flag: 1, status: 10;
-    };
+    uint32_t timestamp;
+    uint16_t totalLength;
+    u_char flags;
+    u_char status;
     uint16_t cache;
     uint16_t padding;
 } cpack, *pcpack;
 
-void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
-    unsigned int size = h->len;
+void packet_handler(u_char *user, const struct pcap_pkthdr *header, const u_char *packet) {
+    unsigned int size = header->len;
     if (size > 0) {
         printf("Got a new packet!\n");
-        struct ether_header *ether_header = (struct ether_header *) bytes;
+        struct ether_header *ether_header = (struct ether_header *) packet;
         if (ether_header->ether_type == ETH_P_IP) {
+            struct iphdr *ip_header = (struct iphdr *) (packet + sizeof(struct ether_header));
+            struct tcphdr *tcp_header = (struct tcphdr *) (packet + sizeof(struct ether_header) + sizeof(struct iphdr));
+            pcpack app_header = (pcpack) (packet + sizeof(struct ether_header) + sizeof(struct iphdr) +
+                                          sizeof(struct tcphdr));
+            int iphdrlen = ip_header->ihl * 4;
+            unsigned long header_size = sizeof(struct ether_header) + iphdrlen + iphdrlen + sizeof(pcpack);
+            //Print out ethernet, IP and TCP headers
+            fprintf(file, "******************************************************\n");
+            fprintf(file, "Ethernet Layer\n");
+            fprintf(file, "Source MAC: %s\n", ether_ntoa((const struct ether_addr *) &ether_header->ether_shost));
+            fprintf(file, "Destination MAC: %s\n",
+                    ether_ntoa((const struct ether_addr *) &ether_header->ether_dhost));
+            fprintf(file, "IP Layer\n");
+            fprintf(file, "Source IP: %s\n", inet_ntoa(*(struct in_addr *) &ip_header->saddr));
+            fprintf(file, "Destination IP: %s\n", inet_ntoa(*(struct in_addr *) &ip_header->daddr));
+            fprintf(file, "******************************************************\n");
+            fprintf(file, "TCP Layer\n");
+            if ((tcp_header->th_flags & TH_SYN) && (tcp_header->th_flags & TH_ACK)) {
+                fprintf(file, "This is a SYN-ACK packet\n");
+            } else if (tcp_header->th_flags & TH_SYN) {
+                fprintf(file, "This is a SYN packet\n");
+            }
+            if (tcp_header->th_flags & TH_ACK) {
+                fprintf(file, "This is a ACK packet\n");
+            }
+            if ((tcp_header->th_flags & TH_FIN) && (tcp_header->th_flags & TH_ACK)) {
+                fprintf(file, "This is a FIN-ACK packet\n");
+            } else if (tcp_header->th_flags & TH_FIN) {
+                fprintf(file, "This is a FIN packet\n");
+            }
+            if ((tcp_header->th_flags & TH_PUSH) && (tcp_header->th_flags & TH_ACK)) {
+                fprintf(file, "This is a PSH-ACK packet\n");
+            } else if (tcp_header->th_flags & TH_PUSH) {
+                fprintf(file, "This is a PSH packet\n");
+            }
 
-            struct iphdr *ip_header = (struct iphdr *) (bytes + sizeof(struct ether_header));
-
-                struct tcphdr *tcp_header = (struct tcphdr *) (bytes + sizeof(struct ether_header) +
-                                                               sizeof(struct iphdr));
-                pcpack app_header = (pcpack) (bytes + sizeof(struct ether_header) + sizeof(struct iphdr) +
-                                              sizeof(struct tcphdr));
-                int iphdrlen = ip_header->ihl * 4;
-                unsigned long header_size = sizeof(struct ether_header) + iphdrlen + iphdrlen + sizeof(pcpack);
-                //Print out ethernet, IP and TCP headers
-                fprintf(file, "******************************************************\n");
-                fprintf(file, "Ethernet Layer\n");
-                fprintf(file, "Source MAC: %s\n", ether_ntoa((const struct ether_addr *) &ether_header->ether_shost));
-                fprintf(file, "Destination MAC: %s\n",
-                        ether_ntoa((const struct ether_addr *) &ether_header->ether_dhost));
-                fprintf(file, "IP Layer\n");
-                fprintf(file, "Source IP: %s\n", inet_ntoa(*(struct in_addr *) &ip_header->saddr));
-                fprintf(file, "Destination IP: %s\n", inet_ntoa(*(struct in_addr *) &ip_header->daddr));
-                fprintf(file, "******************************************************\n");
-                fprintf(file, "TCP Layer\n");
-                if ((tcp_header->th_flags & TH_SYN) && (tcp_header->th_flags & TH_ACK)) {
-                    fprintf(file, "This is a SYN-ACK packet\n");
-                } else if (tcp_header->th_flags & TH_SYN) {
-                    fprintf(file, "This is a SYN packet\n");
-                }
-                if (tcp_header->th_flags & TH_ACK) {
-                    fprintf(file, "This is a ACK packet\n");
-                }
-                if ((tcp_header->th_flags & TH_FIN) && (tcp_header->th_flags & TH_ACK)) {
-                    fprintf(file, "This is a FIN-ACK packet\n");
-                } else if (tcp_header->th_flags & TH_FIN) {
-                    fprintf(file, "This is a FIN packet\n");
-                }
-                if ((tcp_header->th_flags & TH_PUSH) && (tcp_header->th_flags & TH_ACK)) {
-                    fprintf(file, "This is a PSH-ACK packet\n");
-                } else if (tcp_header->th_flags & TH_PUSH) {
-                    fprintf(file, "This is a PSH packet\n");
-                }
-
-                fprintf(file, "Source Port: %d\n", ntohs(tcp_header->source));
-                fprintf(file, "Destination Port: %d\n", ntohs(tcp_header->dest));
-                fprintf(file, "******************************************************\n");
-                fprintf(file, "Application Layer\n");
-                time_t seconds = app_header->unixtime / 1000;
-                struct tm *timeinfo = gmtime(&seconds);
-                u_char cache_flag = ntohs(app_header->flags % 8) / 4;
-                u_char s_flag = ntohs(app_header->flags % 8) / 2;
-                u_char t_flag = ntohs(app_header->flags % 2);
-                fprintf(file, "Timestamp: %s", asctime(timeinfo));
-                fprintf(file, "Length: %d\n", app_header->total_length);
-                fprintf(file, "c_flag: %d\n", cache_flag);
-                fprintf(file, "s_flag: %d\n", s_flag);
-                fprintf(file, "t_flag: %d\n", t_flag);
-                fprintf(file, "Status: %d\n", app_header->status);
-                fprintf(file, "Cache: %d\n", app_header->cache);
-                fprintf(file, "Padding: %d\n", app_header->padding);
-                fprintf(file, "******************************************************\n");
-                printData(bytes + header_size - 62, size);
+            fprintf(file, "Source Port: %d\n", ntohs(tcp_header->source));
+            fprintf(file, "Destination Port: %d\n", ntohs(tcp_header->dest));
+            fprintf(file, "******************************************************\n");
+            fprintf(file, "Application Layer\n");
+            time_t seconds = app_header->timestamp / 1000;
+            struct tm *timeinfo = gmtime(&seconds);
+            u_char cache_flag = ntohs(app_header->flags % 8) / 4;
+            u_char s_flag = ntohs(app_header->flags % 8) / 2;
+            u_char t_flag = ntohs(app_header->flags % 2);
+            fprintf(file, "Timestamp: %s", asctime(timeinfo));
+            fprintf(file, "Length: %d\n", app_header->totalLength);
+            fprintf(file, "c_flag: %d\n", cache_flag);
+            fprintf(file, "s_flag: %d\n", s_flag);
+            fprintf(file, "t_flag: %d\n", t_flag);
+            fprintf(file, "Status: %d\n", app_header->status);
+            fprintf(file, "Cache: %d\n", app_header->cache);
+            fprintf(file, "Padding: %d\n", app_header->padding);
+            fprintf(file, "******************************************************\n");
+            printData(packet + header_size - 62, size);
         }
     }
 }
