@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/ip.h>
 
 char *destIP = NULL;
 char *srcIP = NULL;
@@ -56,33 +57,34 @@ unsigned short in_cksum(unsigned short *buf, int length) {
 
 
 void send_raw_ip_packet(struct iphdr *ip_header) {
+    char packetBuffer[IP_MAXPACKET];
     struct sockaddr_in dest_info;
     int enable = 1;
     // Step 1: Create a raw network socket.
-    int sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-    if (sock == -1) {
-        printf("Error: in opening new raw socket\n", errno);
+    int rawSocket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+    if (rawSocket == -1) {
+        printf("Error: in opening new raw socket %d\n", errno);
         exit(-1);
     }
     // Step 2: Set socket option.
-    int set = setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &enable, sizeof(enable));
+    int set = setsockopt(rawSocket, IPPROTO_IP, IP_HDRINCL, &enable, sizeof(enable));
     if (set == -1) {
-        printf("Error: in setting enable option in socket\n", errno);
+        printf("Error: in setting enable option in socket %d\n", errno);
         exit(-1);
     }
     // Step 3: Provide needed information about destination.
-    destInfo.sin_family = AF_INET;
     memset(&destInfo, 0, sizeof(destInfo));
+    destInfo.sin_family = AF_INET;
     destInfo.sin_addr.s_addr = ip_header->daddr;
     // Step 4: Send the packet out.
-    int bytesSent = sendto(sock, ip_header, ntohs(ip_header->tot_len), 0, (struct sockaddr *) &dest_info,
+    int bytesSent = sendto(rawSocket, ip_header, ntohs(ip_header->tot_len), 0, (struct sockaddr *) &dest_info,
                            sizeof(dest_info));
     if (bytesSent == -1) {
-        printf("Error in sending ICMP message \n", errno);
+        printf("Error in sending ICMP message %d\n", errno);
         exit(-1);
     }
     printf("Sent a spoofed packet using the fake IP: %s to src IP: %s\n", srcIP, destIP);
-    close(sock);
+    close(rawSocket);
 }
 
 int main(int argc, char **argv) {
@@ -93,8 +95,7 @@ int main(int argc, char **argv) {
     /*********************************************************
        Step 1: Fill in the ICMP header.
      ********************************************************/
-    struct icmphdr *icmp = (struct icmphdr *)
-            (buffer + sizeof(struct ipheader));
+    struct icmphdr *icmp = (struct icmphdr *) (buffer + sizeof(struct iphdr));
     icmp->type = ICMP_ECHO; //ICMP Type: 8 is request, 0 is reply.
 
     // Calculate the checksum for integrity

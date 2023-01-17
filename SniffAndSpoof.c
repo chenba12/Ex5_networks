@@ -3,18 +3,16 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <net/ethernet.h>
-#include<stdlib.h> // for exit()
-#include<netinet/udp.h>    //Provides declarations for udp header
-#include<netinet/tcp.h>    //Provides declarations for tcp header
-#include<netinet/ip.h>    //Provides declarations for ip header
-#include<netinet/ip_icmp.h> //Provides declarations for icmp header
-#include <netinet/ether.h>
-#include <time.h>
+#include <stdlib.h>          // for exit()
+#include <netinet/udp.h>     //Provides declarations for udp header
+#include <netinet/ip.h>      //Provides declarations for ip header
+#include <netinet/ip_icmp.h> //Provides declarations for icmp header
 #include <errno.h>
 
 char *destIP = NULL;
 char *srcIP = NULL;
 struct sockaddr_in destInfo;
+
 unsigned short in_cksum(unsigned short *buf, int length);
 
 void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
@@ -107,11 +105,11 @@ int main() {
     pcap_t *handle;
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;
-    char filter_exp[] = "tcp or icmp";
+    char filter_exp[] = "icmp";
     bpf_u_int32 net = 0;
 
     // Step 1: Open live pcap session on NIC with name eth3
-    handle = pcap_open_live("lo", BUFSIZ, 1, 1000, errbuf);
+    handle = pcap_open_live("any", BUFSIZ, 1, 1000, errbuf);
     if (handle == NULL) {
         printf("failed\n");
         exit(-1);

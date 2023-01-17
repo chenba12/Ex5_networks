@@ -3,10 +3,10 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <net/ethernet.h>
-#include<stdlib.h> // for exit()
-#include<netinet/udp.h>    //Provides declarations for udp header
-#include<netinet/tcp.h>    //Provides declarations for tcp header
-#include<netinet/ip.h>    //Provides declarations for ip header
+#include <stdlib.h>         // for exit()
+#include <netinet/udp.h>    //Provides declarations for udp header
+#include <netinet/tcp.h>    //Provides declarations for tcp header
+#include <netinet/ip.h>     //Provides declarations for ip header
 #include <netinet/ether.h>
 #include <time.h>
 
@@ -14,7 +14,7 @@ FILE *file;
 
 void printData(const u_char *data, unsigned int size);
 
-typedef struct calculatorPacket {
+typedef struct app_header {
     uint32_t unixtime;
     uint16_t total_length;
     union {
@@ -30,20 +30,22 @@ void packet_handler(u_char *user, const struct pcap_pkthdr *header, const u_char
     if (size > 0) {
         printf("Got a new packet!\n");
         struct ether_header *ether_header = (struct ether_header *) packet;
+
         struct iphdr *ip_header = (struct iphdr *) (packet + sizeof(struct ether_header));
         int iphdrlen = ip_header->ihl * 4;
+
         struct tcphdr *tcp_header = (struct tcphdr *) (packet + sizeof(struct ether_header) + iphdrlen);
-        pcpack app_header = (pcpack) (packet + sizeof(struct ether_header) + sizeof(struct iphdr) +
-                                      sizeof(struct tcphdr));
-        unsigned long tcphdrlen=tcp_header->doff*4;
-        unsigned long apphdrlen = header->len - sizeof(struct ether_header) - iphdrlen - tcphdrlen;
-        unsigned long header_size = sizeof(struct ether_header) + iphdrlen + tcphdrlen+12;
+        unsigned long tcphdrlen = tcp_header->doff * 4;
+
+        pcpack app_header = (pcpack) (packet + sizeof(struct ether_header) + iphdrlen + tcphdrlen);
+        unsigned long header_size = sizeof(struct ether_header) + iphdrlen + tcphdrlen + 12;
         //Print out ethernet, IP and TCP headers
         fprintf(file, "******************************************************\n");
         fprintf(file, "Ethernet Layer\n");
         fprintf(file, "Source MAC: %s\n", ether_ntoa((const struct ether_addr *) &ether_header->ether_shost));
         fprintf(file, "Destination MAC: %s\n",
                 ether_ntoa((const struct ether_addr *) &ether_header->ether_dhost));
+        fprintf(file, "******************************************************\n");
         fprintf(file, "IP Layer\n");
         fprintf(file, "Source IP: %s\n", inet_ntoa(*(struct in_addr *) &ip_header->saddr));
         fprintf(file, "Destination IP: %s\n", inet_ntoa(*(struct in_addr *) &ip_header->daddr));
@@ -67,24 +69,21 @@ void packet_handler(u_char *user, const struct pcap_pkthdr *header, const u_char
         } else if (tcp_header->th_flags & TH_PUSH) {
             fprintf(file, "This is a PSH packet\n");
         }
-
         fprintf(file, "Source Port: %d\n", ntohs(tcp_header->source));
         fprintf(file, "Destination Port: %d\n", ntohs(tcp_header->dest));
         fprintf(file, "******************************************************\n");
         fprintf(file, "Application Layer\n");
-        time_t seconds = app_header->unixtime / 1000;
+        time_t seconds = ntohl(app_header->unixtime) / 1000;
         struct tm *timeinfo = gmtime(&seconds);
         uint16_t flags = app_header->flags;
         u_char c_flag = flags >> 14 & 1;
         u_char s_flag = flags >> 13 & 1;
         u_char t_flag = flags >> 12 & 1;
         uint16_t status = (app_header->flags >> 2) & 0x03FF;
-        uint16_t packet_len = ntohs(app_header->total_length);
         uint16_t cache = ntohs(app_header->cache);
         uint16_t padding = ntohs(app_header->padding);
-        unsigned long tcpseglen = header->len - sizeof(struct ether_header) - iphdrlen;
         fprintf(file, "Timestamp: %s", asctime(timeinfo));
-        fprintf(file, "Length: %lu\n", tcpseglen);
+        fprintf(file, "Length: %hu\n", ntohs(app_header->total_length));
         fprintf(file, "c_flag: %d\n", c_flag);
         fprintf(file, "s_flag: %d\n", s_flag);
         fprintf(file, "t_flag: %d\n", t_flag);
