@@ -21,6 +21,8 @@ int main(int argc, char **argv) {
 
     struct sockaddr_in clientAddress;
     socklen_t clientAddressLen;
+    printf("waiting for messages...\n");
+
     while (1) {
         memset((char *) &clientAddress, 0, sizeof(clientAddress));
         clientAddressLen = sizeof(clientAddress);
@@ -32,8 +34,10 @@ int main(int argc, char **argv) {
             close(serverSocketUDP);
             exit(-1);
         }
+        printf("received message\n");
         float randomNumber = ((float) random()) / ((float) RAND_MAX);
-        printf("random is %f", randomNumber);
+        printf("random is %f\n", randomNumber);
+        //echo -n this-is-a-message | nc -4u -w1 10.9.0.0 8000
         if (randomNumber > 0.5) {
             //send
             int sentBytes = sendto(clientSocketUDP, packet, receivedBytes, 0, (struct sockaddr *) &clientAddress,
@@ -44,6 +48,7 @@ int main(int argc, char **argv) {
                 close(serverSocketUDP);
                 exit(-1);
             }
+            printf("sent message\n");
         }
     }
     close(clientSocketUDP);

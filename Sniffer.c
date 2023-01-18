@@ -10,9 +10,9 @@
 #include <netinet/ether.h>
 #include <time.h>
 
-FILE *file;
-
 void printData(const u_char *data, unsigned int size);
+
+FILE *file;
 
 typedef struct app_header {
     uint32_t unixtime;
@@ -92,6 +92,7 @@ void packet_handler(u_char *user, const struct pcap_pkthdr *header, const u_char
         fprintf(file, "Padding: %d\n", padding);
         fprintf(file, "******************************************************\n");
         printData(packet + header_size, size);
+
     }
 }
 
@@ -128,7 +129,6 @@ void printData(const u_char *data, unsigned int size) {
                     fprintf(file, ".");
                 }
             }
-
             fprintf(file, "\n");
         }
     }
