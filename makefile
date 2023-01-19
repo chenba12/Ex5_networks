@@ -12,5 +12,6 @@ SniffAndSpoof: SniffAndSpoof.c
 
 Gateway: Gateway.c
 	$(CC) $(CFLAGS) Gateway.c -o Gateway -lpcap
+
 clean:
 	rm -f *.o

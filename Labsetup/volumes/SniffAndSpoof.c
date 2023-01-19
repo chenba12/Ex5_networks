@@ -55,7 +55,8 @@ void packet_handler(u_char *user, const struct pcap_pkthdr *header, const u_char
                     printf("Sniffed a new ICMP request... Generating a fake reply...\n");
                     // sendping back
                     icmp_header->icmp_type = 0;
-                    icmp_header->icmp_chksum = calculate_checksum((unsigned short *) (bytes), 8 + 24);
+                    icmp_header->icmp_chksum = calculate_checksum((unsigned short *) (bytes),
+                                                                  sizeof(struct icmpheader));
 
                     ip_header->iph_ident = 0;
                     ip_header->iph_ver = 4;
